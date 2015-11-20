@@ -1,14 +1,25 @@
-var cheerio = require("cheerio");
-var request = require("request");
-var Promise = require("promise");
-var Rx = require("rx");
-var EventEmitter = require('events').EventEmitter;
+var cheerio = require("cheerio"),
+    request = require("request"),
+    Promise = require("promise"),
+    Rx = require("rx"),
+    EventEmitter = require('events').EventEmitter,
+    Twitter = require('node-twitter');
+    config = require('./const');
 
 var site = 'http://www.gi.alaska.edu';
 var mainUrl = 'AuroraForecast';
 var europeLinkRegex = /.*\/Europe\/\d\d\d\d\d\d\d\d/;
 var levelRegex = /level-(\d)l/;
-var maxDays = 7;
+var maxDays = 14;
+
+var days = 0;
+
+twitter = new Twitter.RestClient(
+    config.CONSUMER_KEY,
+    config.CONSUMER_KEY_SECRET,
+    config.ACCESSTOKEN,
+    config.ACCESSTOKEN_SECRET
+);
 
 
 var promiseRequest = function(url) {
@@ -69,8 +80,20 @@ var getNextDay = function(data) {
 };
 
 
-var tweet = function(messsage) {
-    console.log(messsage);
+var tweet = function(message) {
+    console.log(message);
+    twitter.statusesUpdate(
+        { status: message
+            //, in_reply_to_status_id: 357237590082072576
+        }
+        , function (err, data) {
+            if (err) {
+                console.error(err);
+            } else {
+                console.log(data);
+            }
+        }
+    );
 };
 
 
@@ -112,10 +135,6 @@ request(indexUrl, function(error, response, html) {
                 return link;
             });
 
-        pageNextLinkStream.subscribe(function(link) {
-            console.log(link);
-        });
-
         forCastSum3Days.subscribe(function(forecasts) {
 
             var threeDaySum = parseInt(forecasts[0].forecast) + parseInt(forecasts[1].forecast)
@@ -134,6 +153,15 @@ request(indexUrl, function(error, response, html) {
                 tweet("Two day sum is " + twoDaySum + " on " + forecasts[0].title);
             }
         }, 0);
+
+
+        pageNextLinkStream.subscribe(function(link) {
+            console.log(link);
+            if (days > maxDays) {
+                process.exit()
+            };
+            days += 1;
+        });
 
         getEuropeLink(html, eventEmitter);
 
